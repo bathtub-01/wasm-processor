@@ -344,3 +344,6 @@ hs_err_pid*
 .vscode
 .metals
 .bloop
+
+# chisel generated files
+generated/
