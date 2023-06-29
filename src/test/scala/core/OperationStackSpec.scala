@@ -57,7 +57,7 @@ class OperationStackSimulator(stack_depth: Int) {
 
 class OperationStackSpec extends AnyFreeSpec with ChiselScalatestTester {
 
-  "Stack should operates" in {
+  "Stack should operate" in {
     test(new OperationStack(32, 32))/*.withAnnotations(Seq(WriteVcdAnnotation))*/ { dut =>
       val simulator = new OperationStackSimulator(34)
 
