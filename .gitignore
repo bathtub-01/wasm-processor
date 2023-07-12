@@ -347,3 +347,6 @@ hs_err_pid*
 
 # chisel generated files
 generated/
+
+# wasm files
+wasm-files/

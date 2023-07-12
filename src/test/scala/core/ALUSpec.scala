@@ -49,9 +49,10 @@ class ALUSpec extends AnyFreeSpec with ChiselScalatestTester {
     test(new ALU(32))/*.withAnnotations(Seq(WriteVcdAnnotation))*/ { implicit dut =>
       def run(n: Int, ops: List[opCode.Value] = Nil): Unit = {
         val newOp = if (ops.isEmpty) opCodeGen else ops.head
-        // this can generate more reasonable input for eqz and eq
+        // this can generate more reasonable input for random tests
         val in1 = if (newOp == opCode.eqz && Random.nextInt(10) < 5) 0 else Random.nextInt()
-        val in2 = if (newOp == opCode.eq && Random.nextInt(10) < 5) in1 else Random.nextInt()
+        val in2 = if ((newOp == opCode.eq || (newOp >= opCode.le_s && newOp <= opCode.ge_u)) && Random.nextInt(10) < 5) 
+                    in1 else Random.nextInt()
         val in3 = Random.nextBoolean()
         val out = ALUSimulator.calculate(in1, in2, if(in3) 1 else 0, newOp)
         println(s"op: $newOp, in1: $in1, in2: $in2, in3: ${if(in3) 1 else 0}")
