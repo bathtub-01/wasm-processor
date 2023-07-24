@@ -7,8 +7,7 @@ import chisel3.util._
     https://github.com/chipsalliance/rocket-chip/blob/master/src/main/scala/rocket/ALU.scala
 */
 
-
-object ALUOpCode extends ChiselEnum {
+object ALUOpCode extends OpCodeEnum {
   val eqz = Value
   val eq = Value
   val le = Value
@@ -22,6 +21,16 @@ object ALUOpCode extends ChiselEnum {
   // val rotr = Value
   val select = Value
   val add_sub = Value
+
+  // BitPat only accept literal UInt
+  def length = 11
+  // def litUInt(index: this.Type): UInt = {
+  //   val u = this.all.zip((0 until length).map(_.U(getWidth.W))).find(_._1 == index).map(_._2)
+  //   u match {
+  //     case Some(v) => v
+  //     case _ => throw new RuntimeException("! ILLFORMED ENUM !")
+  //   }
+  // }
 }
 
 /*  is_signed: specify if an instruction is in signed version. Must be cleared for shl.

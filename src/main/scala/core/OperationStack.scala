@@ -6,7 +6,7 @@ import chisel3.experimental.BundleLiterals._
 
 /*  Micro-op for the stack. Each operation takes a single cycle. 
 */
-object StackOpCode extends ChiselEnum {
+object StackOpCode extends OpCodeEnum {
   val idle = Value
   val push1 = Value
   val pop1 = Value
@@ -14,6 +14,7 @@ object StackOpCode extends ChiselEnum {
   val pop2push1 = Value
   val pop3push1_a = Value
   val pop3push1_b = Value
+  def length: Int = 7
 }
 
 object StackErrCode extends ChiselEnum {
@@ -46,12 +47,21 @@ class OperationStack(width: Int, size: Int) extends Module {
   val third = RegInit(emptyVal)
   val lastPushed = RegInit(0.U(32.W)) // avoid read-after-write
   val justPushed = RegInit(false.B)
-  val stk = SyncReadMem(size, Bits(width.W))
+  val stk = /* SyncReadMem(size, Bits(width.W)) */ Module(new BlockMem(width, size))
   val stkPtr = RegInit(0.U(log2Ceil(size).W))
   val stkIndex = WireInit(0.U(log2Ceil(size).W))
-  val memReadEn = WireInit(true.B)
-  val memDataOut = stk.read(stkIndex, memReadEn)
+  // val memReadEn = WireInit(true.B)
+  val memWriteEn = WireInit(false.B)
+  val memDataOut = /* stk.read(stkIndex, memReadEn) */ Wire(Bits(width.W))
   io.debug := memDataOut
+
+  // stk.io.rdEna := memReadEn
+  memDataOut := stk.io.rdData
+  stk.io.rdAddr := stkIndex
+
+  stk.io.wrAddr := stkPtr
+  stk.io.wrEna := memWriteEn
+  stk.io.wrData := DontCare
 
   def empty: Bool = stkPtr === 0.U
   def eat = {
@@ -85,8 +95,10 @@ class OperationStack(width: Int, size: Int) extends Module {
       second := top
       third := second
       when(third.valid) {
-        memReadEn := false.B
-        stk.write(stkPtr, third.data)
+        // memReadEn := false.B
+        memWriteEn := true.B
+        // stk.write(stkPtr, third.data)
+        stk.io.wrData := third.data
         stkPtr := stkPtr + 1.U
         lastPushed := third.data
         justPushed := true.B
