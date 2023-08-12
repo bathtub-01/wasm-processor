@@ -70,7 +70,7 @@ class ALU(width: Int) extends Module {
   val cond_out = io.fn.is_cond_inv ^ cond_out_default
   
   // selector
-  val selector_out = Mux(io.fn.opcode === ALUOpCode.select, Mux(io.in3 === 0.U, io.in2, io.in1), 0.U)
+  val selector_out = Mux(io.fn.opcode === ALUOpCode.select, Mux(io.in2 === 0.U, io.in1, io.in3), 0.U)
 
   // and/or/xor
   val logic_out = Mux(io.fn.opcode === ALUOpCode.xor || io.fn.opcode === ALUOpCode.or, io.in1 ^ io.in2, 0.U) |

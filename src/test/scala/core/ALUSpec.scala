@@ -12,7 +12,7 @@ object ALUSimulator {
         add, sub, and, or, xor, shl, shr_s, shr_u = Value
   }
   def calculate(in1: Int, in2: Int, in3: Int, op: opCode.Value): Int = op match {
-  case opCode.select  => if (in3 == 0) in2 else in1
+  case opCode.select  => if (in2 == 0) in1 else in3
   case opCode.eqz     => if (in1 == 0) 1 else 0
   case opCode.eq      => if (in1 == in2) 1 else 0
   case opCode.ne      => if (in1 != in2) 1 else 0

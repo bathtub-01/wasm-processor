@@ -5,13 +5,6 @@ import chisel3.util._
 import chisel3.util.experimental.decode._
 import chisel3.experimental.BundleLiterals._
 
-object Constant {
-  def N = BitPat.N(1)
-  def Y = BitPat.Y(1)
-  def X = BitPat.dontCare(1)
-  def ALU_XX = BitPat.dontCare(ALUOpCode.getWidth)
-}
-
 class ControlSignals extends Bundle {
   val illegal = Bool()
   val is_alu = Bool()

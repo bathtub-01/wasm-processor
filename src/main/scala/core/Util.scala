@@ -3,6 +3,13 @@ package core
 import chisel3._
 import chisel3.util._
 
+object Constant {
+  def N = BitPat.N(1)
+  def Y = BitPat.Y(1)
+  def X = BitPat.dontCare(1)
+  def ALU_XX = BitPat.dontCare(ALUOpCode.getWidth)
+}
+
 abstract class OpCodeEnum extends ChiselEnum {
   def length: Int
   def litUInt(index: this.Type): UInt = {
