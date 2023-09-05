@@ -29,11 +29,11 @@ class BlockMem(width: Int, depth: Int) extends Module {
 /*  We use ROM (Vec) for testing, this module has the same read/write
     timing as BlockMem.
 */
-class BlockMemROM(width: Int, depth: Int) extends Module {
+class BlockMemROM(width: Int, depth: Int)(bin: WASMBins.Bin) extends Module {
   val io = IO(new MemIOBundle(width, depth))
 
   import WASMBins._
-  val mem = VecInit(alu_logic_1)
+  val mem = VecInit(bin)
   io.rdData := RegNext(mem(io.rdAddr))
 
   when(io.wrEna) {

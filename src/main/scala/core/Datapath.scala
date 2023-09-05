@@ -16,6 +16,7 @@ class Datapath(width: Int) extends Module {
     val instr = Input(Bits(8.W))
     val new_instr = Input(Bool())
     val leb128_din = Input(Bits(32.W))
+    val consume_top = Input(Bool())
     val stack_top = Output(Bits(32.W))
     val step = Output(Bool())
   })
@@ -49,6 +50,10 @@ class Datapath(width: Int) extends Module {
     }.otherwise {
       datapathSTM := idle
     }
+  }
+
+  when(io.consume_top) {
+    opStack.io.opcode := StackOpCode.pop1
   }
 
   switch(datapathSTM) {

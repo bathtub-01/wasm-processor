@@ -3,28 +3,33 @@ package core
 import chisel3._
 import chisel3.util._
 import chisel3.util.experimental.decode._
-import os.proc
 
 class SmallControlSignals extends Bundle {
   val should_pass = Bool() // should pass it to instruction decoder
   val have_data = Bool() // have following data
   val fast = Bool() // fast instruction
+  // val cf = ControlFlowIns()
+  val control_flow = Bool() // is a control flow instruction
 }
 
-/*  A small decoder is used in IDFetcher for instructions ought to 
-    be executed in this stage (mainly control flow related ones).
+/*  A small decoder is used in IDFetcher for controls in fetching 
+    stage.
 */
 object SmallDecodeTable {
   import Constant._
   import Instructions._
+  def CF(opcode: ControlFlowIns.Type): BitPat = BitPat(ControlFlowIns.litUInt(opcode))
   def default: List[BitPat] = 
-    List(Y, N, Y)
+    List(Y, N, Y, N/* CF(ControlFlowIns.not) */)
   def table: List[(BitPat, List[BitPat])] = List(
-    UNREACHABLE     -> List(N, N, Y),
-    NOP             -> List(N, N, Y),
-    BLOCK           -> List(N, N, Y), // ignore the block type2
-    I32_CONSTANT    -> List(Y, Y, Y),
-    SELECT          -> List(Y, N, N)
+    UNREACHABLE     -> List(N, N, Y, N/* CF(ControlFlowIns.not) */),
+    NOP             -> List(N, N, Y, N/* CF(ControlFlowIns.not) */),
+    BLOCK           -> List(N, Y, Y, Y/* CF(ControlFlowIns.block) */),
+    LOOP            -> List(N, Y, Y, Y/* CF(ControlFlowIns.loop)*/),
+    BR              -> List(N, Y, N, Y/* CF(ControlFlowIns.br) */),
+    BR_IF           -> List(N, Y, N, Y/* CF(ControlFlowIns.br_i)*/),
+    I32_CONSTANT    -> List(Y, Y, Y, N/* CF(ControlFlowIns.not) */),
+    SELECT          -> List(Y, N, N, N/* CF(ControlFlowIns.not) */)
   )
 }
 
@@ -38,9 +43,10 @@ class SmallDecoder extends Module {
   val inputs = table.map(_._1)
   val decode_out = outputTable.zip(default).map{case (o, d) => decoder(QMCMinimizer, io.instr, TruthTable(inputs.zip(o), d))}
   import io.control_signals._
-  Seq(should_pass,have_data, fast).zip(decode_out).foreach{case (s, o) => s match {
+  Seq(should_pass,have_data, fast, control_flow).zip(decode_out).foreach{case (s, o) => s match {
       // case alu: ALUOpCode.Type => alu := ALUOpCode.safe(o)._1
       // case stack: StackOpCode.Type => stack := StackOpCode.safe(o)._1
+      // case c_flow: ControlFlowIns.Type => c_flow := ControlFlowIns.safe(o)._1
       case _ => s := o
     }
   }
@@ -52,27 +58,27 @@ object IDFetcherState extends ChiselEnum {
   val decoding = Value
   val processing = Value
   val data_fetch = Value
-  val data_fetch_done = Value
+  val walking = Value
   val stop = Value
 }
 
-/*  Instruction and data fetcher. Also manages control flow.*/
+/*  Instruction and data fetcher.*/
 class IDFetcher extends Module {
   val io = IO(new Bundle {
     val new_pc = Flipped(ValidIO(UInt(32.W)))
-    val step = Input(Bool()) // branch not taken, i.e. execute next instruction
-    val instr = Output(Bits(8.W))
-    val new_instr = Output(Bool())
+    val step = Input(Bool()) // execute the next instruction
+    val instr_alu = Output(Bits(8.W))
+    val new_instr_alu = Output(Bool())
+    val instr_cf = Output(Bits(8.W))
     val leb128_dout = Output(Bits(32.W))
-    // val context_switch = Output(Bool())
-    // val output_valid = Output(Bool())
+    val loop_addr = Output(Bits(32.W))
   })
   import IDFetcherState._
   val pc = RegInit(0.U(32.W))
   val leb128SignedDecoder = Module(new LEB128SignedDecoder)
   val leb128UnsignedDecoder = Module(new LEB128UnsignedDecoder)
-  // val wasmMem = Module(new BlockMem(8, 1024 * 16)) // where .wasm file stays. maybe using a Rom?
-  val wasmMem = Module(new BlockMemROM(8, 1024 * 16))
+  // val wasmMem = Module(new BlockMem(8, 1024 * 16)) 
+  val wasmMem = Module(new BlockMemROM(8, 1024)(WASMBins.loop_2))
   val smallDecoder = Module(new SmallDecoder)
   val readOutWire = wasmMem.io.rdData
   val instr = RegInit(0.U(8.W))
@@ -93,9 +99,11 @@ class IDFetcher extends Module {
   wasmMem.io.wrAddr := 0.U
   wasmMem.io.wrData := 0.U
   smallDecoder.io.instr := readOutWire
-  io.instr := 0.U
-  io.new_instr := false.B
+  io.instr_alu := 0.U
+  io.new_instr_alu := false.B
+  io.instr_cf := 0.U
   io.leb128_dout := false.B
+  io.loop_addr := 0.U
 
   def backIdle = {
     when(csReg.fast) {
@@ -118,7 +126,6 @@ class IDFetcher extends Module {
     is(idle) { // 000
       when(io.step) {
         pc := pc + 1.U
-        // STM := instr_fetch
         STM := decoding
       }
       when(io.new_pc.valid) {
@@ -128,6 +135,7 @@ class IDFetcher extends Module {
     }
     is(instr_fetch) { // 001
       STM := decoding
+      pc := pc + 1.U
     }
     is(decoding) { // 010
       instr := readOutWire
@@ -139,11 +147,11 @@ class IDFetcher extends Module {
         STM := processing
       }
     }
-    is(processing) { // try to only stay in this state for one cycle // 011
+    is(processing) { // 011
       when(!csReg.have_data) {
         when(csReg.should_pass) {
-          io.instr := instr
-          io.new_instr := true.B
+          io.instr_alu := instr
+          io.new_instr_alu := true.B
         }
         backIdle
       }.otherwise { // have data
@@ -157,19 +165,25 @@ class IDFetcher extends Module {
     }
     is(data_fetch) { // 100
       when(noMoreDataByte) {
-        io.instr := instr
-        io.new_instr := true.B
-        io.leb128_dout := leb128SignedDecoder.io.dout
+        backIdle
+        when(csReg.control_flow) {
+          io.instr_cf := instr
+          io.leb128_dout := leb128UnsignedDecoder.io.dout
+          io.loop_addr := pc - 1.U
+        }.otherwise {
+          io.instr_alu := instr
+          io.new_instr_alu := true.B
+          io.leb128_dout := leb128SignedDecoder.io.dout
+        }
         leb128Data.foreach(_ := 0.U)
         leb128DataIdx := 1.U
-        backIdle
       }.otherwise {
         leb128Data(leb128DataIdx) := readOutWire
         noMoreDataByte := !readOutWire(7)
         dataIsNeg := readOutWire(6)
         leb128DataIdx := leb128DataIdx + 1.U
+        pc := pc + 1.U
       }
-      pc := pc + 1.U
     }
     is(stop) {/* stop here! */} // 110
   }

@@ -11,12 +11,17 @@ class IDFetcher_Datapath extends Module {
   })
   val f = Module(new IDFetcher)
   val d = Module(new Datapath(32))
-  f.io.new_pc.valid := false.B
-  f.io.new_pc.bits := false.B
-  f.io.step := Mux(io.start, true.B, d.io.step)
-  d.io.instr := f.io.instr
+  val cf = Module(new ControlFlowUnit)
+  f.io.new_pc <> cf.io.new_pc
+  f.io.step := io.start | d.io.step | cf.io.step
+  d.io.instr := f.io.instr_alu
   d.io.leb128_din := f.io.leb128_dout
-  d.io.new_instr := f.io.new_instr
+  d.io.new_instr := f.io.new_instr_alu
+  d.io.consume_top := cf.io.consume_top
+  cf.io.instr := f.io.instr_cf
+  cf.io.loop_addr := f.io.loop_addr
+  cf.io.br_call_target := f.io.leb128_dout
+  cf.io.stack_top := d.io.stack_top
   io.stack_top := d.io.stack_top
 }
 
@@ -28,7 +33,7 @@ class FetchAndexecuteSpec extends AnyFreeSpec with ChiselScalatestTester {
       dut.io.start.poke(true)
       dut.clock.step()
       dut.io.start.poke(false)
-      dut.clock.step(30)
+      dut.clock.step(80)
     }
   }
 }

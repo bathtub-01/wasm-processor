@@ -9,5 +9,5 @@ object Main extends App {
   // emitVerilog(new Decoder, Array("--target-dir", "generated"))
   // emitVerilog(new BlockMem(128, 4096), Array("--target-dir", "generated"))
   // emitVerilog(new Datapath(32), Array("--target-dir", "generated"))
-  emitVerilog(new IDFetcher, Array("--target-dir", "generated"))
+  emitVerilog(new ControlFlowStack(32, 32), Array("--target-dir", "generated"))
 }
