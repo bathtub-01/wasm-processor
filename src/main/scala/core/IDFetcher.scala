@@ -5,7 +5,7 @@ import chisel3.util._
 import chisel3.util.experimental.decode._
 
 class SmallControlSignals extends Bundle {
-  val should_pass = Bool() // should pass it to instruction decoder
+  val should_pass = Bool() // should pass it to alu
   val have_data = Bool() // have following data
   val fast = Bool() // fast instruction
   // val cf = ControlFlowIns()
@@ -28,6 +28,7 @@ object SmallDecodeTable {
     LOOP            -> List(N, Y, Y, Y/* CF(ControlFlowIns.loop)*/),
     BR              -> List(N, Y, N, Y/* CF(ControlFlowIns.br) */),
     BR_IF           -> List(N, Y, N, Y/* CF(ControlFlowIns.br_i)*/),
+    END             -> List(N, N, Y, Y),
     I32_CONSTANT    -> List(Y, Y, Y, N/* CF(ControlFlowIns.not) */),
     SELECT          -> List(Y, N, N, N/* CF(ControlFlowIns.not) */)
   )
@@ -67,6 +68,7 @@ class IDFetcher extends Module {
   val io = IO(new Bundle {
     val new_pc = Flipped(ValidIO(UInt(32.W)))
     val step = Input(Bool()) // execute the next instruction
+    val walking = Input(Bool())
     val instr_alu = Output(Bits(8.W))
     val new_instr_alu = Output(Bool())
     val instr_cf = Output(Bits(8.W))
@@ -78,7 +80,7 @@ class IDFetcher extends Module {
   val leb128SignedDecoder = Module(new LEB128SignedDecoder)
   val leb128UnsignedDecoder = Module(new LEB128UnsignedDecoder)
   // val wasmMem = Module(new BlockMem(8, 1024 * 16)) 
-  val wasmMem = Module(new BlockMemROM(8, 1024)(WASMBins.loop_2))
+  val wasmMem = Module(new BlockMemROM(8, 1024)(WASMBins.block_loop1))
   val smallDecoder = Module(new SmallDecoder)
   val readOutWire = wasmMem.io.rdData
   val instr = RegInit(0.U(8.W))
@@ -106,7 +108,7 @@ class IDFetcher extends Module {
   io.loop_addr := 0.U
 
   def backIdle = {
-    when(csReg.fast) {
+    when(csReg.fast || io.walking) {
       instr := readOutWire
       csReg := smallDecoder.io.control_signals
       pc := pc + 1.U // a little bit of speculation
@@ -149,9 +151,12 @@ class IDFetcher extends Module {
     }
     is(processing) { // 011
       when(!csReg.have_data) {
-        when(csReg.should_pass) {
+        when(csReg.should_pass && !io.walking) {
           io.instr_alu := instr
           io.new_instr_alu := true.B
+        }
+        when(csReg.control_flow) {
+          io.instr_cf := instr // END
         }
         backIdle
       }.otherwise { // have data
@@ -171,9 +176,11 @@ class IDFetcher extends Module {
           io.leb128_dout := leb128UnsignedDecoder.io.dout
           io.loop_addr := pc - 1.U
         }.otherwise {
-          io.instr_alu := instr
-          io.new_instr_alu := true.B
-          io.leb128_dout := leb128SignedDecoder.io.dout
+          when(!io.walking) { 
+            io.instr_alu := instr
+            io.new_instr_alu := true.B
+            io.leb128_dout := leb128SignedDecoder.io.dout
+          }
         }
         leb128Data.foreach(_ := 0.U)
         leb128DataIdx := 1.U

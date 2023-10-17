@@ -4,6 +4,7 @@ import chisel3._
 import chiseltest._
 import org.scalatest.freespec.AnyFreeSpec
 
+// wrapper module for testing
 class IDFetcher_Datapath extends Module {
   val io = IO(new Bundle {
     val start = Input(Bool())
@@ -22,6 +23,7 @@ class IDFetcher_Datapath extends Module {
   cf.io.loop_addr := f.io.loop_addr
   cf.io.br_call_target := f.io.leb128_dout
   cf.io.stack_top := d.io.stack_top
+  f.io.walking := cf.io.walking
   io.stack_top := d.io.stack_top
 }
 

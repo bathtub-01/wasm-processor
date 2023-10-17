@@ -72,4 +72,32 @@ object WASMBins {
     0x0a.U(8.W),            // 10   (i32 literal)
     0x00.U(8.W)             // machine stop
   )
+  val block_loop1: Bin = Seq(
+    0x41.U(8.W),            // i32.const
+    0x7b.U(8.W),            // -5   (i32 literal)
+    0x41.U(8.W),            // i32.const
+    0x01.U(8.W),            // 1   (i32 literal)
+    0x02.U(8.W),            // block
+    0x40.U(8.W),            // void
+    0x03.U(8.W),            // loop
+    0x40.U(8.W),            // void
+    0x41.U(8.W),            // i32.const
+    0x03.U(8.W),            // 3    (i32 literal)
+    0x1a.U(8.W),            // drop
+    0x0c.U(8.W),            // br
+    0x01.U(8.W),            // 1    (br depth)
+    0x0b.U(8.W),            // end
+    0x41.U(8.W),            // i32.const
+    0x02.U(8.W),            // 2    (i32 literal)
+    0x02.U(8.W),            // block
+    0x40.U(8.W),            // void
+    0x0b.U(8.W),            // end
+    0x1a.U(8.W),            // drop
+    0x0b.U(8.W),            // end
+    0x1a.U(8.W),            // drop
+    0x41.U(8.W),            // i32.const
+    0x2a.U(8.W),            // 42   (i32 literal)
+    0x6a.U(8.W),            // i32.add
+    0x00.U(8.W)             // machine stop
+  )
 }
